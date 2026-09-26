@@ -9,7 +9,9 @@ import {
   GAD7_STORAGE_SCHEMA_VERSION,
   Gad7AssessmentRecord,
   Gad7AssessmentStorageEnvelope,
-  deserializeGad7AssessmentEnvelope,
+  Gad7StorageDiagnostic,
+  Gad7StorageStatus,
+  inspectGad7AssessmentStorage,
   serializeGad7AssessmentEnvelope
 } from '../models/gad7-storage';
 
@@ -25,7 +27,10 @@ export const GAD7_BROWSER_STORAGE = new InjectionToken<Gad7StorageLike>(
 
 export interface Gad7LoadResult {
   readonly records: readonly Gad7AssessmentRecord[];
-  readonly error: unknown | null;
+  readonly status: Gad7StorageStatus | 'inaccessible';
+  readonly diagnostic: Gad7StorageDiagnostic | null;
+  readonly error: Gad7StorageDiagnostic | null;
+  readonly rejectedRecordCount: number;
 }
 
 export interface Gad7SaveResult {
@@ -45,24 +50,30 @@ export class Gad7AssessmentPersistenceService {
     try {
       serialized = this.storage.getItem(GAD7_STORAGE_KEY);
     } catch (error) {
-      return { records: [], error };
+      const diagnostic: Gad7StorageDiagnostic = {
+        code: 'storage-inaccessible',
+        message: 'GAD-7 storage could not be read'
+      };
+      return { records: [], status: 'inaccessible', diagnostic, error: diagnostic, rejectedRecordCount: 0 };
     }
 
     if (serialized === null) {
-      return { records: [], error: null };
+      return { records: [], status: 'missing', diagnostic: null, error: null, rejectedRecordCount: 0 };
     }
 
-    try {
-      return { records: deserializeGad7AssessmentEnvelope(serialized).records, error: null };
-    } catch (error) {
-      // Issue #13 owns malformed and older-data policy. Do not repair or rewrite it here.
-      return { records: [], error };
-    }
+    const inspected = inspectGad7AssessmentStorage(serialized);
+    return {
+      records: inspected.records,
+      status: inspected.status,
+      diagnostic: inspected.diagnostic,
+      error: inspected.diagnostic,
+      rejectedRecordCount: inspected.rejectedRecordCount
+    };
   }
 
   save(answers: Gad7Answers, result: Gad7Interpretation): Gad7SaveResult {
     const loaded = this.load();
-    if (loaded.error !== null) {
+    if (loaded.status === 'inaccessible' || loaded.status === 'invalid' || loaded.status === 'unsupported') {
       return { success: false, error: loaded.error };
     }
 

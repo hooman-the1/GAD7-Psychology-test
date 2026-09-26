@@ -4,6 +4,7 @@ import {
   Gad7AssessmentRecord,
   Gad7AssessmentStorageEnvelope,
   deserializeGad7AssessmentEnvelope,
+  inspectGad7AssessmentStorage,
   serializeGad7AssessmentEnvelope
 } from './gad7-storage';
 
@@ -71,8 +72,10 @@ describe('GAD-7 assessment storage contract', () => {
       records: [{ ...representativeRecord, score: 22 }]
     });
 
-    expect(() => deserializeGad7AssessmentEnvelope(serialized))
-      .toThrowError(RangeError, 'GAD-7 score must be an integer between 0 and 21');
+    expect(inspectGad7AssessmentStorage(serialized)).toEqual(jasmine.objectContaining({
+      status: 'invalid',
+      records: []
+    }));
   });
 
   it('preserves all-zero answers and a non-zero answer permutation', () => {
@@ -118,5 +121,74 @@ describe('GAD-7 assessment storage contract', () => {
     expect(serialized).not.toContain('HttpClient');
     expect(serialized).not.toContain('SessionID');
     expect(serialized).not.toContain('localStorage');
+  });
+
+  it('returns a bounded diagnostic for malformed JSON without throwing', () => {
+    const outcome = inspectGad7AssessmentStorage('{not-json');
+
+    expect(outcome.records).toEqual([]);
+    expect(outcome.status).toBe('invalid');
+    expect(outcome.diagnostic?.code).toBe('malformed-json');
+    expect(outcome.diagnostic?.message.length).toBeLessThan(160);
+  });
+
+  it('recovers valid records while rejecting invalid neighbors in original order', () => {
+    const outcome = inspectGad7AssessmentStorage(JSON.stringify({
+      version: 1,
+      records: [
+        representativeRecord,
+        { ...representativeRecord, id: 42 },
+        { ...representativeRecord, id: 'gad7-third', score: 21, result: { ...representativeRecord.result, score: 21 } }
+      ]
+    }));
+
+    expect(outcome.status).toBe('recovered');
+    expect(outcome.records.map((record) => record.id)).toEqual(['gad7-2026-09-26T10:20:30.000Z-001', 'gad7-third']);
+    expect(outcome.rejectedRecordCount).toBe(1);
+    expect(outcome.diagnostic?.code).toBe('invalid-records');
+  });
+
+  it('ignores unsupported versions without attempting migration', () => {
+    const outcome = inspectGad7AssessmentStorage(JSON.stringify({
+      version: 0,
+      records: [representativeRecord]
+    }));
+
+    expect(outcome).toEqual(jasmine.objectContaining({
+      records: [],
+      status: 'unsupported',
+      rejectedRecordCount: 0
+    }));
+    expect(outcome.diagnostic?.code).toBe('unsupported-version');
+  });
+
+  it('rejects malformed envelope shapes without throwing', () => {
+    for (const value of [null, [], 1, { version: 1 }, { version: 1, records: {} }]) {
+      const outcome = inspectGad7AssessmentStorage(JSON.stringify(value));
+      expect(outcome.records).toEqual([]);
+      expect(outcome.status).toBe('invalid');
+    }
+  });
+
+  it('rejects missing, incorrectly typed, and malformed record fields individually', () => {
+    const { result: _missingResult, ...recordWithoutResult } = representativeRecord;
+    const invalidRecords: unknown[] = [
+      recordWithoutResult,
+      { ...representativeRecord, id: 7 },
+      { ...representativeRecord, completedAt: 7 },
+      { ...representativeRecord, answers: [0, 1, 2] },
+      { ...representativeRecord, answers: [0, 1, 2, 3, 4, 0, 1] },
+      { ...representativeRecord, score: 1.5 },
+      { ...representativeRecord, score: null },
+      { ...representativeRecord, category: 'unknown' },
+      { ...representativeRecord, result: { ...representativeRecord.result, severity: 7 } },
+      { ...representativeRecord, result: { ...representativeRecord.result, gauge: { ...representativeRecord.result.gauge, marker: null } } }
+    ];
+
+    for (const record of invalidRecords) {
+      const outcome = inspectGad7AssessmentStorage(JSON.stringify({ version: 1, records: [record] }));
+      expect(outcome.status).toBe('invalid');
+      expect(outcome.records).toEqual([]);
+    }
   });
 });

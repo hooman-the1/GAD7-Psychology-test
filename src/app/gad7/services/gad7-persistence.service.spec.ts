@@ -49,8 +49,52 @@ describe('Gad7AssessmentPersistenceService', () => {
   });
 
   it('loads empty storage without creating unrelated keys', () => {
-    expect(service.load()).toEqual({ records: [], error: null });
+    expect(service.load()).toEqual(jasmine.objectContaining({ records: [], status: 'missing', error: null }));
     expect(storage.keys()).toEqual([]);
+  });
+
+  it('reports malformed storage without overwriting the raw value', () => {
+    const raw = '{not-json';
+    storage.setItem(GAD7_STORAGE_KEY, raw);
+
+    const outcome = service.load();
+
+    expect(outcome.records).toEqual([]);
+    expect(outcome.status).toBe('invalid');
+    expect(outcome.diagnostic?.code).toBe('malformed-json');
+    expect(storage.getItem(GAD7_STORAGE_KEY)).toBe(raw);
+  });
+
+  it('keeps recovered records available and preserves them on a later save', () => {
+    const valid = service.save(answers, result).record as Gad7AssessmentRecord;
+    storage.setItem(GAD7_STORAGE_KEY, JSON.stringify({
+      version: 1,
+      records: [valid, { ...valid, id: 7 }]
+    }));
+
+    const loaded = service.load();
+    const saved = service.save(answers, result);
+    const savedRecord = saved.record as Gad7AssessmentRecord;
+
+    expect(loaded.status).toBe('recovered');
+    expect(loaded.records.map((record) => record.id)).toEqual([valid.id]);
+    expect(saved.success).toBeTrue();
+    expect(service.load().records.map((record) => record.id)).toEqual([
+      savedRecord.id,
+      valid.id
+    ]);
+  });
+
+  it('ignores unsupported versions and leaves their raw data untouched', () => {
+    const raw = JSON.stringify({ version: 2, records: [] });
+    storage.setItem(GAD7_STORAGE_KEY, raw);
+
+    const outcome = service.load();
+
+    expect(outcome.records).toEqual([]);
+    expect(outcome.status).toBe('unsupported');
+    expect(outcome.diagnostic?.code).toBe('unsupported-version');
+    expect(storage.getItem(GAD7_STORAGE_KEY)).toBe(raw);
   });
 
   it('preserves multiple records newest first, including zero and maximum scores', () => {
@@ -76,7 +120,11 @@ describe('Gad7AssessmentPersistenceService', () => {
   it('uses only the GAD-7 key and does not read unrelated storage', () => {
     storage.setItem('phq9.assessment-history', JSON.stringify({ records: [{ id: 'wrong' }] }));
 
-    expect(service.load()).toEqual({ records: [], error: null });
+    expect(service.load()).toEqual(jasmine.objectContaining({
+      records: [],
+      status: 'missing',
+      error: null
+    }));
     expect(storage.getItem(GAD7_STORAGE_KEY)).toBeNull();
   });
 
