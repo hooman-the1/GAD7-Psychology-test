@@ -12,7 +12,13 @@ module.exports = function (config) {
     jasmineHtmlReporter: { suppressAll: true },
     coverageReporter: { dir: require('path').join(__dirname, './coverage/gad7'), reporters: [{ type: 'html' }, { type: 'text-summary' }] },
     reporters: ['progress', 'kjhtml'],
-    browsers: ['ChromeHeadless'],
+    customLaunchers: {
+      ChromeHeadlessNoGpu: {
+        base: 'ChromeHeadless',
+        flags: ['--disable-gpu']
+      }
+    },
+    browsers: ['ChromeHeadlessNoGpu'],
     restartOnFileChange: false
   });
 };
