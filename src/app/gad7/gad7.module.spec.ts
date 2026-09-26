@@ -113,8 +113,10 @@ describe('local GAD-7 feature boundary', () => {
   });
 
   it('displays the locally calculated total for every representative score boundary', () => {
+    const fixture = createFixture();
+    const component = fixture.componentInstance;
+
     [0, 1, 4, 5, 9, 10, 14, 15, 19, 20, 21].forEach((expectedScore) => {
-      const fixture = createFixture();
       const answers = Array(7).fill(0) as number[];
       let remaining = expectedScore;
       answers.forEach((_, index) => {
@@ -123,13 +125,13 @@ describe('local GAD-7 feature boundary', () => {
       });
 
       answers.forEach((answer, index) => {
-        fixture.componentInstance.questionnaire.controls[
-          `answer${index}` as keyof typeof fixture.componentInstance.questionnaire.controls
+        component.questionnaire.controls[
+          `answer${index}` as keyof typeof component.questionnaire.controls
         ].setValue(answer);
       });
 
-      expect(fixture.componentInstance.submitQuestionnaire()).toBeTrue();
-      expect(fixture.componentInstance.activeResult?.score).toBe(expectedScore);
+      expect(component.submitQuestionnaire()).toBeTrue();
+      expect(component.activeResult?.score).toBe(expectedScore);
     });
   });
 
