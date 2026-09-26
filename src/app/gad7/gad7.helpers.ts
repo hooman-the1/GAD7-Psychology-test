@@ -86,33 +86,7 @@ export function getGaugeMarkers(value: number, color: string) {
     };
 }
 
-const INTERPRETATION_LEVELS: Record<SeverityCategory, Omit<Gad7Interpretation, 'score' | 'category' | 'warning' | 'gauge'>> = {
-    minimal: {
-        severity: 'کمترین اضطراب',
-        recommendation: 'نیازی به اقدام خاصی نیست، اما مراقب حال خود باشید.',
-        emoji: '🙂'
-    },
-    mild: {
-        severity: 'اضطراب خفیف',
-        recommendation: 'تغییرات خلق و خوی خود را زیر نظر داشته باشید و در صورت نیاز با یک مشاور صحبت کنید.',
-        emoji: '🙂'
-    },
-    moderate: {
-        severity: 'اضطراب متوسط',
-        recommendation: 'صحبت با یک روانشناس توصیه می‌شود.',
-        emoji: '😐'
-    },
-    moderately_severe: {
-        severity: 'اضطراب نسبتاً شدید',
-        recommendation: 'به شدت توصیه می‌شود از یک متخصص سلامت روان کمک بگیرید.',
-        emoji: '😟'
-    },
-    severe: {
-        severity: 'اضطراب شدید',
-        recommendation: 'نیاز فوری به مداخله تخصصی روانشناسی یا روانپزشکی وجود دارد.',
-        emoji: '😨'
-    }
-};
+const INTERPRETATION_LEVELS = SEVERITY_LEVELS;
 
 const INTERPRETATION_COLORS: Record<SeverityCategory, string> = {
     minimal: '#43a047',
