@@ -39,6 +39,11 @@ export interface Gad7SaveResult {
   readonly error?: unknown;
 }
 
+export type Gad7DeleteResult =
+  | { readonly status: 'deleted'; readonly recordId: string }
+  | { readonly status: 'missing'; readonly recordId: string }
+  | { readonly status: 'failed'; readonly recordId: string; readonly error: unknown };
+
 let fallbackIdSequence = 0;
 
 @Injectable({ providedIn: 'root' })
@@ -96,6 +101,42 @@ export class Gad7AssessmentPersistenceService {
     } catch (error) {
       return { success: false, error };
     }
+  }
+
+  deleteById(recordId: string): Gad7DeleteResult {
+    const loaded = this.load();
+    if (loaded.status === 'inaccessible' || loaded.status === 'invalid' || loaded.status === 'unsupported') {
+      return { status: 'failed', recordId, error: loaded.error ?? new Error('GAD-7 persistence failed') };
+    }
+
+    if (!loaded.records.some((record) => record.id === recordId)) {
+      return { status: 'missing', recordId };
+    }
+
+    const envelope: Gad7AssessmentStorageEnvelope = {
+      version: GAD7_STORAGE_SCHEMA_VERSION,
+      records: loaded.records.filter((record) => record.id !== recordId)
+    };
+
+    try {
+      this.storage.setItem(GAD7_STORAGE_KEY, serializeGad7AssessmentEnvelope(envelope));
+    } catch (error) {
+      return { status: 'failed', recordId, error };
+    }
+
+    const verified = this.load();
+    if (verified.status === 'inaccessible'
+      || verified.status === 'invalid'
+      || verified.status === 'unsupported'
+      || verified.records.some((record) => record.id === recordId)) {
+      return {
+        status: 'failed',
+        recordId,
+        error: verified.error ?? new Error('GAD-7 deletion could not be confirmed')
+      };
+    }
+
+    return { status: 'deleted', recordId };
   }
 }
 

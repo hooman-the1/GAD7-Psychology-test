@@ -346,7 +346,6 @@ describe('local GAD-7 feature boundary', () => {
     expect(fixture.componentInstance.selectedAssessmentId).toBe(saved.id);
     expect(window.localStorage.getItem(GAD7_STORAGE_KEY)).toBe(before);
     expect(fixture.nativeElement.querySelector('[data-history-edit]')).toBeNull();
-    expect(fixture.nativeElement.querySelector('[data-history-delete]')).toBeNull();
     expect(fixture.nativeElement.querySelector('[data-history-selection]')?.textContent)
       .toContain(saved.id);
   });
@@ -405,7 +404,6 @@ describe('local GAD-7 feature boundary', () => {
     expect(fixture.nativeElement.querySelector('[data-detail-score]')?.textContent).toContain('0');
     expect(fixture.nativeElement.querySelector('[data-detail-edit]')).toBeNull();
     expect(fixture.nativeElement.querySelector('[data-detail-submit]')).toBeNull();
-    expect(fixture.nativeElement.querySelector('[data-history-delete]')).toBeNull();
     expect(fixture.nativeElement.querySelector('[data-history-clear-all]')).toBeNull();
   });
 
@@ -448,6 +446,130 @@ describe('local GAD-7 feature boundary', () => {
     expect(fixture.nativeElement.querySelector('[data-assessment-detail]')).toBeNull();
     expect(fixture.nativeElement.querySelector('[data-detail-unavailable]')?.textContent)
       .toContain('unavailable');
+  });
+
+  it('requires confirmation and cancellation leaves storage, history, and detail unchanged', () => {
+    const persistence = new Gad7AssessmentPersistenceService(window.localStorage);
+    const saved = persistence.save([0, 1, 2, 3, 0, 1, 2], getGad7Interpretation(9)).record!;
+    const fixture = createFixture();
+    const component = fixture.componentInstance;
+    component.selectAssessment(saved.id);
+    fixture.detectChanges();
+    const before = window.localStorage.getItem(GAD7_STORAGE_KEY);
+
+    const deleteButton = fixture.nativeElement.querySelector('[data-history-delete]') as HTMLButtonElement;
+    expect(deleteButton).toBeTruthy();
+    deleteButton.click();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('[data-delete-confirmation]')?.textContent)
+      .toContain(saved.id);
+    expect(window.localStorage.getItem(GAD7_STORAGE_KEY)).toBe(before);
+    expect(component.selectedAssessmentId).toBe(saved.id);
+
+    (fixture.nativeElement.querySelector('[data-delete-cancel]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+
+    expect(window.localStorage.getItem(GAD7_STORAGE_KEY)).toBe(before);
+    expect(component.savedAssessments.map((record) => record.id)).toEqual([saved.id]);
+    expect(fixture.nativeElement.querySelector('[data-assessment-detail]')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('[data-delete-confirmation]')).toBeNull();
+  });
+
+  it('deletes the confirmed record and clears its selected detail without affecting the active result', () => {
+    const persistence = new Gad7AssessmentPersistenceService(window.localStorage);
+    const first = persistence.save([0, 0, 0, 0, 0, 0, 0], getGad7Interpretation(0)).record!;
+    const second = persistence.save([3, 3, 3, 3, 3, 3, 3], getGad7Interpretation(21)).record!;
+    const fixture = createFixture();
+    const component = fixture.componentInstance;
+    component.selectAssessment(first.id);
+    component.questionnaire.controls.answer0.setValue(1);
+    component.questionnaire.controls.answer1.setValue(1);
+    component.questionnaire.controls.answer2.setValue(1);
+    component.questionnaire.controls.answer3.setValue(1);
+    component.questionnaire.controls.answer4.setValue(1);
+    component.questionnaire.controls.answer5.setValue(1);
+    component.questionnaire.controls.answer6.setValue(1);
+    component.submitQuestionnaire();
+    const activeResult = component.activeResult;
+    fixture.detectChanges();
+
+    const item = fixture.nativeElement.querySelector(`[data-record-id="${first.id}"]`) as HTMLElement;
+    (item.querySelector('[data-history-delete]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    (fixture.nativeElement.querySelector('[data-delete-confirm]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+
+    const activeRecord = component.savedAssessments[0];
+    expect(component.savedAssessments.map((record) => record.id)).toEqual([activeRecord.id, second.id]);
+    expect(component.selectedAssessmentId).toBeNull();
+    expect(fixture.nativeElement.querySelector('[data-assessment-detail]')).toBeNull();
+    expect(component.activeResult).toBe(activeResult);
+    expect(component.submittedAnswers).toEqual([1, 1, 1, 1, 1, 1, 1]);
+    expect(new Gad7AssessmentPersistenceService(window.localStorage).load().records.map((record) => record.id))
+      .toEqual([activeRecord.id, second.id]);
+  });
+
+  it('preserves a different selected detail, handles missing and last-record deletion safely', () => {
+    const persistence = new Gad7AssessmentPersistenceService(window.localStorage);
+    const first = persistence.save([0, 0, 0, 0, 0, 0, 0], getGad7Interpretation(0)).record!;
+    const second = persistence.save([1, 1, 1, 1, 1, 1, 1], getGad7Interpretation(7)).record!;
+    const fixture = createFixture();
+    const component = fixture.componentInstance;
+    component.selectAssessment(first.id);
+    component.requestDelete('missing-record');
+    component.confirmDelete();
+    expect(component.savedAssessments.map((record) => record.id)).toEqual([second.id, first.id]);
+
+    component.requestDelete(second.id);
+    component.confirmDelete();
+    fixture.detectChanges();
+    expect(component.selectedAssessmentId).toBe(first.id);
+    expect(fixture.nativeElement.querySelector('[data-detail-record-id]')?.textContent).toContain(first.id);
+
+    component.requestDelete(first.id);
+    component.confirmDelete();
+    fixture.detectChanges();
+    expect(component.savedAssessments).toEqual([]);
+    expect(component.selectedAssessmentId).toBeNull();
+    expect(fixture.nativeElement.querySelector('[data-history-empty]')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('[data-assessment-detail]')).toBeNull();
+  });
+
+  it('does not claim deletion when the storage write fails', () => {
+    const persistence = new Gad7AssessmentPersistenceService(window.localStorage);
+    const saved = persistence.save([0, 0, 0, 0, 0, 0, 0], getGad7Interpretation(0)).record!;
+    const fixture = createFixture();
+    const component = fixture.componentInstance;
+    component.requestDelete(saved.id);
+    spyOn(window.localStorage, 'setItem').and.throwError('write failed');
+
+    component.confirmDelete();
+
+    expect(component.savedAssessments.map((record) => record.id)).toEqual([saved.id]);
+    expect(component.persistenceFailure).toBeTruthy();
+    expect(component.deleteConfirmationId).toBeNull();
+  });
+
+  it('does not claim deletion when the storage read fails', () => {
+    const persistence = new Gad7AssessmentPersistenceService(window.localStorage);
+    const saved = persistence.save([0, 0, 0, 0, 0, 0, 0], getGad7Interpretation(0)).record!;
+    const fixture = createFixture();
+    const component = fixture.componentInstance;
+    component.selectAssessment(saved.id);
+    component.requestDelete(saved.id);
+    const before = window.localStorage.getItem(GAD7_STORAGE_KEY);
+    spyOn(window.localStorage, 'getItem').and.throwError('read failed');
+
+    component.confirmDelete();
+    fixture.detectChanges();
+
+    expect(component.savedAssessments.map((record) => record.id)).toEqual([saved.id]);
+    expect(component.selectedAssessmentId).toBe(saved.id);
+    expect(component.persistenceFailure).toBeTruthy();
+    expect(window.localStorage.getItem).toHaveBeenCalledWith(GAD7_STORAGE_KEY);
+    expect(before).toContain(saved.id);
+    expect(fixture.nativeElement.querySelector('[data-assessment-detail]')).toBeTruthy();
   });
 
   it('rebuilds and selects read-only details after component recreation', () => {

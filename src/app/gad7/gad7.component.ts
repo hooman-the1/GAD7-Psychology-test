@@ -39,6 +39,7 @@ export class Gad7Component {
   selectionUnavailable = false;
   historyUnavailable = false;
   persistenceFailure: unknown | null = null;
+  deleteConfirmationId: string | null = null;
 
   constructor(private readonly persistence: Gad7AssessmentPersistenceService) {
     const history = persistence.load();
@@ -87,6 +88,42 @@ export class Gad7Component {
     const exists = this.savedAssessments.some((record) => record.id === recordId);
     this.selectedAssessmentId = exists ? recordId : null;
     this.selectionUnavailable = !exists;
+  }
+
+  requestDelete(recordId: string): void {
+    if (this.savedAssessments.some((record) => record.id === recordId)) {
+      this.deleteConfirmationId = recordId;
+    }
+  }
+
+  cancelDelete(): void {
+    this.deleteConfirmationId = null;
+  }
+
+  confirmDelete(): void {
+    const recordId = this.deleteConfirmationId;
+    if (!recordId) return;
+
+    const outcome = this.persistence.deleteById(recordId);
+    this.deleteConfirmationId = null;
+    if (outcome.status !== 'deleted') {
+      if (outcome.status === 'failed') this.persistenceFailure = outcome.error;
+      return;
+    }
+
+    const history = this.persistence.load();
+    if (history.status === 'inaccessible' || history.status === 'invalid' || history.status === 'unsupported') {
+      this.persistenceFailure = history.error ?? new Error('GAD-7 persistence failed');
+      return;
+    }
+
+    this.savedAssessments = history.records;
+    this.historyUnavailable = false;
+    this.persistenceFailure = null;
+    if (this.selectedAssessmentId === recordId) {
+      this.selectedAssessmentId = null;
+      this.selectionUnavailable = false;
+    }
   }
 
   get selectedAssessment(): Gad7AssessmentRecord | null {

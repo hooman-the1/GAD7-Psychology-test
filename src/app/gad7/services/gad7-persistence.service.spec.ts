@@ -156,6 +156,55 @@ describe('Gad7AssessmentPersistenceService', () => {
     expect(storage.getItem(GAD7_STORAGE_KEY)).toBe(before);
   });
 
+  it('deletes exactly one record by ID and preserves the remaining order', () => {
+    const first = service.save(answers, result).record as Gad7AssessmentRecord;
+    const second = service.save([0, 0, 0, 0, 0, 0, 0], {
+      ...result,
+      score: 0,
+      category: 'minimal',
+      gauge: { ...result.gauge, value: 0 }
+    }).record as Gad7AssessmentRecord;
+
+    const outcome = service.deleteById(first.id);
+
+    expect(outcome).toEqual({ status: 'deleted', recordId: first.id });
+    expect(service.load().records.map((record) => record.id)).toEqual([second.id]);
+    expect(service.load().records[0].score).toBe(0);
+  });
+
+  it('returns a missing outcome without rewriting storage', () => {
+    const saved = service.save(answers, result).record as Gad7AssessmentRecord;
+    const before = storage.getItem(GAD7_STORAGE_KEY);
+
+    const outcome = service.deleteById('missing-record');
+
+    expect(outcome).toEqual({ status: 'missing', recordId: 'missing-record' });
+    expect(storage.getItem(GAD7_STORAGE_KEY)).toBe(before);
+    expect(service.load().records.map((record) => record.id)).toEqual([saved.id]);
+  });
+
+  it('returns a failure without replacing data when deletion cannot write', () => {
+    const saved = service.save(answers, result).record as Gad7AssessmentRecord;
+    const before = storage.getItem(GAD7_STORAGE_KEY);
+    storage.failWrites = true;
+
+    const outcome = service.deleteById(saved.id);
+
+    expect(outcome.status).toBe('failed');
+    expect(outcome.recordId).toBe(saved.id);
+    expect(storage.getItem(GAD7_STORAGE_KEY)).toBe(before);
+  });
+
+  it('does not read or modify an unrelated history key while deleting', () => {
+    const saved = service.save(answers, result).record as Gad7AssessmentRecord;
+    const phq9 = JSON.stringify({ records: [{ id: 'phq9-record' }] });
+    storage.setItem('phq9.assessment-history', phq9);
+
+    service.deleteById(saved.id);
+
+    expect(storage.getItem('phq9.assessment-history')).toBe(phq9);
+  });
+
   it('returns an empty collection when storage reads fail', () => {
     storage.failReads = true;
 

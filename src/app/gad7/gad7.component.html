@@ -97,6 +97,19 @@
       >
         View assessment
       </button>
+      <button
+        type="button"
+        data-history-delete
+        [attr.aria-label]="'Delete assessment ' + record.id"
+        (click)="requestDelete(record.id)"
+      >
+        Delete assessment
+      </button>
+      <div *ngIf="deleteConfirmationId === record.id" data-delete-confirmation role="alertdialog">
+        <p>Delete assessment {{ record.id }} completed {{ record.completedAt }} with score {{ record.score }}?</p>
+        <button type="button" data-delete-confirm (click)="confirmDelete()">Confirm deletion</button>
+        <button type="button" data-delete-cancel (click)="cancelDelete()">Cancel</button>
+      </div>
     </li>
   </ol>
   <p *ngIf="selectedAssessmentId as selectedId" data-history-selection role="status">
