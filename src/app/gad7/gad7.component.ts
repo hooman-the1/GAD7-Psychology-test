@@ -1,6 +1,5 @@
 import { Component, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup, Validators, FormArray, FormControl } from '@angular/forms';
-import { HttpClient } from '@angular/common/http';
 
 import {
   getSeverityCategory,
@@ -12,8 +11,6 @@ import {
 } from './gad7.helpers';
 
 import { SeverityCategory, questions } from './gad7.constants';
-import { SessionID } from './shared/sessionid.service';
-import { environment } from './config/environment';
 
 @Component({
   selector: 'app-gad-7',
@@ -35,25 +32,15 @@ export class Gad7Component implements OnInit {
   severityColor = '';
   gaugeLabel = 'Score';
 
-  initialSubRoute = '/test/gad7?action=enter';
-  patchSubRoute = '/test/gad7?action=calculate-result';
-  sessionKey = 'gad7_session_id';
-
   gaugeMarkers: any = {};
 
-  constructor(
-    private fb: FormBuilder,
-    private sessionIdService: SessionID,
-    private http: HttpClient,
-  ) {}
+  constructor(private fb: FormBuilder) {}
 
   ngOnInit(): void {
     this.gadForm = this.fb.group({
       answers: this.fb.array(this.questions.map(() => this.fb.control(null, Validators.required)))
     });
 
-    const sessionId = this.sessionIdService.ensureSessionId(this.sessionKey);
-    this.http.post(environment.apiBaseUrl + this.initialSubRoute, { sessionId }).subscribe();
   }
 
   get answers(): FormArray {
@@ -93,14 +80,6 @@ export class Gad7Component implements OnInit {
     this.gaugeMarkers = getGaugeMarkers(this.gaugeValue, this.gaugeColorCode);
   }
 
-  private sendDataToServer(category: string): void {
-    const sessionId = this.sessionIdService.ensureSessionId(this.sessionKey);
-    this.http.patch(environment.apiBaseUrl + this.patchSubRoute, {
-      sessionId,
-      severity: category
-    }).subscribe();
-  }
-
   submit(): void {
     if (this.gadForm.invalid) return;
 
@@ -108,12 +87,6 @@ export class Gad7Component implements OnInit {
     const category = getSeverityCategory(this.totalScore);
     this.setSeverityDetails(category);
     this.finalizeResults();
-    this.sendDataToServer(category);
-  }
-
-  private handleSessionIDInRestart(): string {
-    localStorage.removeItem(this.sessionKey);
-    return this.sessionIdService.ensureSessionId(this.sessionKey);
   }
 
   private handlePropertiesInReset(): void {
@@ -124,9 +97,7 @@ export class Gad7Component implements OnInit {
   }
 
   restart(): void {
-    const sessionId = this.handleSessionIDInRestart();
     this.handlePropertiesInReset();
-    this.http.post(environment.apiBaseUrl + this.initialSubRoute, { sessionId }).subscribe();
   }
 }
 
