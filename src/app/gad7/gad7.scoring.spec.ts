@@ -1,5 +1,6 @@
 import {
   calculateGad7Score,
+  getGad7Interpretation,
   getSeverityCategory,
   scoreGad7Answer
 } from './gad7.helpers';
@@ -41,6 +42,51 @@ describe('GAD-7 scoring', () => {
 
     expected.forEach(([score, category]) => {
       expect(getSeverityCategory(score)).toBe(category);
+    });
+  });
+
+  it('returns complete deterministic interpretations for every band and boundary', () => {
+    const expected = [
+      [0, 'minimal', 'کمترین اضطراب', 'نیازی به اقدام خاصی نیست، اما مراقب حال خود باشید.', '#43a047'],
+      [2, 'minimal', 'کمترین اضطراب', 'نیازی به اقدام خاصی نیست، اما مراقب حال خود باشید.', '#43a047'],
+      [4, 'minimal', 'کمترین اضطراب', 'نیازی به اقدام خاصی نیست، اما مراقب حال خود باشید.', '#43a047'],
+      [5, 'mild', 'اضطراب خفیف', 'تغییرات خلق و خوی خود را زیر نظر داشته باشید و در صورت نیاز با یک مشاور صحبت کنید.', '#fdd835'],
+      [7, 'mild', 'اضطراب خفیف', 'تغییرات خلق و خوی خود را زیر نظر داشته باشید و در صورت نیاز با یک مشاور صحبت کنید.', '#fdd835'],
+      [9, 'mild', 'اضطراب خفیف', 'تغییرات خلق و خوی خود را زیر نظر داشته باشید و در صورت نیاز با یک مشاور صحبت کنید.', '#fdd835'],
+      [10, 'moderate', 'اضطراب متوسط', 'صحبت با یک روانشناس توصیه می‌شود.', '#fb8c00'],
+      [12, 'moderate', 'اضطراب متوسط', 'صحبت با یک روانشناس توصیه می‌شود.', '#fb8c00'],
+      [14, 'moderate', 'اضطراب متوسط', 'صحبت با یک روانشناس توصیه می‌شود.', '#fb8c00'],
+      [15, 'moderately_severe', 'اضطراب نسبتاً شدید', 'به شدت توصیه می‌شود از یک متخصص سلامت روان کمک بگیرید.', '#e53935'],
+      [17, 'moderately_severe', 'اضطراب نسبتاً شدید', 'به شدت توصیه می‌شود از یک متخصص سلامت روان کمک بگیرید.', '#e53935'],
+      [19, 'moderately_severe', 'اضطراب نسبتاً شدید', 'به شدت توصیه می‌شود از یک متخصص سلامت روان کمک بگیرید.', '#e53935'],
+      [20, 'severe', 'اضطراب شدید', 'نیاز فوری به مداخله تخصصی روانشناسی یا روانپزشکی وجود دارد.', '#b71c1c'],
+      [21, 'severe', 'اضطراب شدید', 'نیاز فوری به مداخله تخصصی روانشناسی یا روانپزشکی وجود دارد.', '#b71c1c']
+    ] as const;
+
+    expected.forEach(([score, category, severity, recommendation, color]) => {
+      const result = getGad7Interpretation(score);
+
+      expect(result).toEqual(jasmine.objectContaining({
+        score,
+        category,
+        severity,
+        recommendation,
+        warning: null,
+        gauge: {
+          min: 0,
+          max: 21,
+          value: score,
+          color,
+          marker: jasmine.objectContaining({ color })
+        }
+      }));
+      expect(getGad7Interpretation(score)).toEqual(result);
+    });
+  });
+
+  it('rejects invalid, fractional, and out-of-range scores explicitly', () => {
+    [-1, 22, 1.5, Number.NaN, Number.POSITIVE_INFINITY].forEach((score) => {
+      expect(() => getGad7Interpretation(score)).toThrowError(/score must be an integer from 0 through 21/);
     });
   });
 });

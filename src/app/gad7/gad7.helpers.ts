@@ -11,6 +11,29 @@ export type Gad7Answers = readonly [
     Gad7AnswerValue
 ];
 
+export interface Gad7GaugeConfiguration {
+    min: 0;
+    max: 21;
+    value: number;
+    color: string;
+    marker: {
+        color: string;
+        type: 'triangle';
+        size: 10;
+        label: string;
+    };
+}
+
+export interface Gad7Interpretation {
+    score: number;
+    category: SeverityCategory;
+    severity: string;
+    recommendation: string;
+    warning: null;
+    emoji: string;
+    gauge: Gad7GaugeConfiguration;
+}
+
 export function scoreGad7Answer(answer: Gad7AnswerValue): number {
     switch (answer) {
         case 0:
@@ -59,6 +82,73 @@ export function getGaugeMarkers(value: number, color: string) {
             type: 'triangle',
             size: 10,
             label: 'نمره شما',
+        }
+    };
+}
+
+const INTERPRETATION_LEVELS: Record<SeverityCategory, Omit<Gad7Interpretation, 'score' | 'category' | 'warning' | 'gauge'>> = {
+    minimal: {
+        severity: 'کمترین اضطراب',
+        recommendation: 'نیازی به اقدام خاصی نیست، اما مراقب حال خود باشید.',
+        emoji: '🙂'
+    },
+    mild: {
+        severity: 'اضطراب خفیف',
+        recommendation: 'تغییرات خلق و خوی خود را زیر نظر داشته باشید و در صورت نیاز با یک مشاور صحبت کنید.',
+        emoji: '🙂'
+    },
+    moderate: {
+        severity: 'اضطراب متوسط',
+        recommendation: 'صحبت با یک روانشناس توصیه می‌شود.',
+        emoji: '😐'
+    },
+    moderately_severe: {
+        severity: 'اضطراب نسبتاً شدید',
+        recommendation: 'به شدت توصیه می‌شود از یک متخصص سلامت روان کمک بگیرید.',
+        emoji: '😟'
+    },
+    severe: {
+        severity: 'اضطراب شدید',
+        recommendation: 'نیاز فوری به مداخله تخصصی روانشناسی یا روانپزشکی وجود دارد.',
+        emoji: '😨'
+    }
+};
+
+const INTERPRETATION_COLORS: Record<SeverityCategory, string> = {
+    minimal: '#43a047',
+    mild: '#fdd835',
+    moderate: '#fb8c00',
+    moderately_severe: '#e53935',
+    severe: '#b71c1c'
+};
+
+export function getGad7Interpretation(score: number): Gad7Interpretation {
+    if (!Number.isInteger(score) || score < 0 || score > 21) {
+        throw new RangeError('score must be an integer from 0 through 21');
+    }
+
+    const category = getSeverityCategory(score);
+    const color = INTERPRETATION_COLORS[category];
+    const level = INTERPRETATION_LEVELS[category];
+
+    return {
+        score,
+        category,
+        severity: level.severity,
+        recommendation: level.recommendation,
+        warning: null,
+        emoji: level.emoji,
+        gauge: {
+            min: 0,
+            max: 21,
+            value: score,
+            color,
+            marker: {
+                color,
+                type: 'triangle',
+                size: 10,
+                label: 'نمره شما'
+            }
         }
     };
 }
