@@ -103,3 +103,61 @@
     Selected assessment: {{ selectedId }} (read-only)
   </p>
 </section>
+
+<section *ngIf="selectedAssessment as assessment" data-assessment-detail aria-labelledby="assessment-detail-title">
+  <h2 id="assessment-detail-title">Assessment details (read-only)</h2>
+  <p data-detail-record-id>Record ID: {{ assessment.id }}</p>
+  <time [attr.datetime]="assessment.completedAt" data-detail-completed-at>
+    Completed: {{ assessment.completedAt }}
+  </time>
+
+  <section data-detail-answers aria-labelledby="detail-answers-title">
+    <h3 id="detail-answers-title">Submitted answers</h3>
+    <ol>
+      <li
+        *ngFor="let question of questions; let questionIndex = index"
+        data-detail-question
+        [attr.data-question]="questionIndex + 1"
+      >
+        <span>{{ question.prompt }}</span>
+        <span data-detail-answer>{{ assessment.answers[questionIndex] }}</span>
+      </li>
+    </ol>
+  </section>
+
+  <section data-detail-result aria-labelledby="detail-result-title">
+    <h3 id="detail-result-title">Stored result</h3>
+    <p data-detail-score>Score: {{ assessment.score }}</p>
+    <p data-detail-category>Category: {{ assessment.category }}</p>
+    <p data-detail-severity>Severity: {{ assessment.result.severity }}</p>
+    <p data-detail-recommendation>Recommendation: {{ assessment.result.recommendation }}</p>
+    <p
+      data-detail-warning
+      [attr.data-warning-state]="assessment.result.warning ? 'present' : 'none'"
+    >
+      Warning: {{ assessment.result.warning || 'None' }}
+    </p>
+    <p data-detail-emoji>Icon: {{ assessment.result.emoji }}</p>
+    <div
+      data-detail-gauge
+      [attr.data-gauge-min]="assessment.result.gauge.min"
+      [attr.data-gauge-max]="assessment.result.gauge.max"
+      [attr.data-gauge-value]="assessment.result.gauge.value"
+      [attr.data-gauge-color]="assessment.result.gauge.color"
+    >
+      Gauge: {{ assessment.result.gauge.value }} / {{ assessment.result.gauge.max }}
+      <span
+        data-detail-gauge-marker
+        [attr.data-marker-color]="assessment.result.gauge.marker.color"
+        [attr.data-marker-type]="assessment.result.gauge.marker.type"
+        [attr.data-marker-size]="assessment.result.gauge.marker.size"
+      >
+        {{ assessment.result.gauge.marker.label }}
+      </span>
+    </div>
+  </section>
+</section>
+
+<p *ngIf="detailUnavailable" data-detail-unavailable role="status">
+  Selected assessment is unavailable.
+</p>

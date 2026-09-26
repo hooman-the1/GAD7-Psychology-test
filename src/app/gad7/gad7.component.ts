@@ -36,6 +36,7 @@ export class Gad7Component {
   activeResult: Gad7Interpretation | null = null;
   savedAssessments: readonly Gad7AssessmentRecord[];
   selectedAssessmentId: string | null = null;
+  selectionUnavailable = false;
   historyUnavailable = false;
   persistenceFailure: unknown | null = null;
 
@@ -83,9 +84,20 @@ export class Gad7Component {
   }
 
   selectAssessment(recordId: string): void {
-    this.selectedAssessmentId = this.savedAssessments.some((record) => record.id === recordId)
-      ? recordId
-      : null;
+    const exists = this.savedAssessments.some((record) => record.id === recordId);
+    this.selectedAssessmentId = exists ? recordId : null;
+    this.selectionUnavailable = !exists;
+  }
+
+  get selectedAssessment(): Gad7AssessmentRecord | null {
+    if (!this.selectedAssessmentId) return null;
+    return this.savedAssessments.find((record) => record.id === this.selectedAssessmentId) ?? null;
+  }
+
+  get detailUnavailable(): boolean {
+    return this.selectionUnavailable || (
+      this.selectedAssessmentId !== null && this.selectedAssessment === null
+    );
   }
 
   answerControl(questionIndex: number): FormControl<number | null> {
