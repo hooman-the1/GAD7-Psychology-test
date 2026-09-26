@@ -59,4 +59,12 @@
   >
     {{ result.gauge.value }} / {{ result.gauge.max }}
   </div>
+  <button
+    mat-raised-button
+    type="button"
+    data-restart-assessment
+    (click)="restartAssessment()"
+  >
+    Restart assessment
+  </button>
 </section>

@@ -66,6 +66,15 @@ export class Gad7Component {
     return true;
   }
 
+  restartAssessment(): void {
+    this.questionnaire.reset();
+    this.validationAttempted = false;
+    this.submissionAccepted = false;
+    this.submittedAnswers = null;
+    this.activeResult = null;
+    this.persistenceFailure = null;
+  }
+
   answerControl(questionIndex: number): FormControl<number | null> {
     return this.questionnaire.controls[
       `answer${questionIndex}` as keyof typeof this.questionnaire.controls

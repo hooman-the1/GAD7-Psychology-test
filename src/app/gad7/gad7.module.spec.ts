@@ -188,4 +188,92 @@ describe('local GAD-7 feature boundary', () => {
     expect(component.savedAssessments).toHaveSize(1);
     expect(component.persistenceFailure).toBeNull();
   });
+
+  it('offers a restart control that clears a completed assessment without changing saved records', () => {
+    const fixture = createFixture();
+    const component = fixture.componentInstance;
+
+    [3, 0, 2, 1, 0, 3, 1].forEach((answer, index) => {
+      component.questionnaire.controls[`answer${index}` as keyof typeof component.questionnaire.controls]
+        .setValue(answer);
+    });
+    component.submitQuestionnaire();
+    const savedRecords = component.savedAssessments;
+    const storedHistory = window.localStorage.getItem(GAD7_STORAGE_KEY);
+    const setItem = spyOn(window.localStorage, 'setItem').and.callThrough();
+    fixture.detectChanges();
+
+    const restart = fixture.nativeElement.querySelector('[data-restart-assessment]') as HTMLButtonElement;
+    expect(restart).toBeTruthy();
+
+    restart.click();
+    fixture.detectChanges();
+
+    expect(component.questionnaire.value).toEqual({
+      answer0: null,
+      answer1: null,
+      answer2: null,
+      answer3: null,
+      answer4: null,
+      answer5: null,
+      answer6: null
+    });
+    expect(component.activeResult).toBeNull();
+    expect(component.submittedAnswers).toBeNull();
+    expect(component.submissionAccepted).toBeFalse();
+    expect(component.validationAttempted).toBeFalse();
+    expect(component.savedAssessments).toBe(savedRecords);
+    expect(component.questionnaire.pristine).toBeTrue();
+    expect(component.questionnaire.untouched).toBeTrue();
+    expect(setItem).not.toHaveBeenCalled();
+    expect(window.localStorage.getItem(GAD7_STORAGE_KEY)).toBe(storedHistory);
+    expect(fixture.nativeElement.querySelector('[data-active-result]')).toBeNull();
+    expect(fixture.nativeElement.querySelectorAll('[data-validation-error]').length).toBe(0);
+  });
+
+  it('can submit a new zero-valued assessment after restart', () => {
+    const fixture = createFixture();
+    const component = fixture.componentInstance;
+    component.questionnaire.controls.answer0.setValue(1);
+    component.questionnaire.controls.answer1.setValue(1);
+    component.questionnaire.controls.answer2.setValue(1);
+    component.questionnaire.controls.answer3.setValue(1);
+    component.questionnaire.controls.answer4.setValue(1);
+    component.questionnaire.controls.answer5.setValue(1);
+    component.questionnaire.controls.answer6.setValue(1);
+    component.submitQuestionnaire();
+
+    component.restartAssessment();
+    for (let index = 0; index < 7; index += 1) {
+      component.questionnaire.controls[`answer${index}` as keyof typeof component.questionnaire.controls]
+        .setValue(0);
+    }
+
+    expect(component.submitQuestionnaire()).toBeTrue();
+    expect(component.activeResult?.score).toBe(0);
+    expect(component.submittedAnswers).toEqual([0, 0, 0, 0, 0, 0, 0]);
+  });
+
+  it('makes repeated restart safe from a blank or partially answered assessment', () => {
+    const fixture = createFixture();
+    const component = fixture.componentInstance;
+
+    component.questionnaire.controls.answer2.setValue(2);
+    component.submitQuestionnaire();
+    component.restartAssessment();
+    component.restartAssessment();
+
+    expect(component.questionnaire.value).toEqual({
+      answer0: null,
+      answer1: null,
+      answer2: null,
+      answer3: null,
+      answer4: null,
+      answer5: null,
+      answer6: null
+    });
+    expect(component.activeResult).toBeNull();
+    expect(component.submittedAnswers).toBeNull();
+    expect(component.validationAttempted).toBeFalse();
+  });
 });
