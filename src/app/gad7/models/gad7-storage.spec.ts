@@ -162,6 +162,20 @@ describe('GAD-7 assessment storage contract', () => {
     expect(outcome.diagnostic?.code).toBe('unsupported-version');
   });
 
+  it('ignores a future unsupported version without exposing records', () => {
+    const outcome = inspectGad7AssessmentStorage(JSON.stringify({
+      version: 2,
+      records: [representativeRecord]
+    }));
+
+    expect(outcome).toEqual(jasmine.objectContaining({
+      records: [],
+      status: 'unsupported',
+      rejectedRecordCount: 0
+    }));
+    expect(outcome.diagnostic?.code).toBe('unsupported-version');
+  });
+
   it('rejects malformed envelope shapes without throwing', () => {
     for (const value of [null, [], 1, { version: 1 }, { version: 1, records: {} }]) {
       const outcome = inspectGad7AssessmentStorage(JSON.stringify(value));
@@ -170,25 +184,98 @@ describe('GAD-7 assessment storage contract', () => {
     }
   });
 
-  it('rejects missing, incorrectly typed, and malformed record fields individually', () => {
-    const { result: _missingResult, ...recordWithoutResult } = representativeRecord;
-    const invalidRecords: unknown[] = [
-      recordWithoutResult,
-      { ...representativeRecord, id: 7 },
-      { ...representativeRecord, completedAt: 7 },
-      { ...representativeRecord, answers: [0, 1, 2] },
-      { ...representativeRecord, answers: [0, 1, 2, 3, 4, 0, 1] },
-      { ...representativeRecord, score: 1.5 },
-      { ...representativeRecord, score: null },
-      { ...representativeRecord, category: 'unknown' },
-      { ...representativeRecord, result: { ...representativeRecord.result, severity: 7 } },
-      { ...representativeRecord, result: { ...representativeRecord.result, gauge: { ...representativeRecord.result.gauge, marker: null } } }
+  it('rejects each missing required record field independently', () => {
+    const missingFieldFixtures: Array<{ field: string; record: unknown }> = [
+      { field: 'id', record: withoutField('id') },
+      { field: 'completedAt', record: withoutField('completedAt') },
+      { field: 'answers', record: withoutField('answers') },
+      { field: 'score', record: withoutField('score') },
+      { field: 'category', record: withoutField('category') },
+      { field: 'result', record: withoutField('result') }
     ];
 
-    for (const record of invalidRecords) {
-      const outcome = inspectGad7AssessmentStorage(JSON.stringify({ version: 1, records: [record] }));
-      expect(outcome.status).toBe('invalid');
-      expect(outcome.records).toEqual([]);
+    for (const fixture of missingFieldFixtures) {
+      expectInvalidRecordFixture(`missing ${fixture.field}`, fixture.record);
     }
   });
+
+  it('rejects invalid record identity, timestamp, answers, score, and category fixtures', () => {
+    const invalidRecordFixtures: Array<{ name: string; record: unknown }> = [
+      { name: 'non-string id', record: { ...representativeRecord, id: 7 } },
+      { name: 'empty id', record: { ...representativeRecord, id: '' } },
+      { name: 'non-string timestamp', record: { ...representativeRecord, completedAt: 7 } },
+      { name: 'invalid timestamp', record: { ...representativeRecord, completedAt: 'not-a-timestamp' } },
+      { name: 'answers with the wrong length', record: { ...representativeRecord, answers: [0, 1, 2] } },
+      { name: 'answer value below zero', record: { ...representativeRecord, answers: [-1, 0, 0, 0, 0, 0, 0] } },
+      { name: 'answer value above three', record: { ...representativeRecord, answers: [4, 0, 0, 0, 0, 0, 0] } },
+      { name: 'fractional answer value', record: { ...representativeRecord, answers: [1.5, 0, 0, 0, 0, 0, 0] } },
+      { name: 'non-numeric answer value', record: { ...representativeRecord, answers: ['1', 0, 0, 0, 0, 0, 0] } },
+      { name: 'score below zero', record: { ...representativeRecord, score: -1 } },
+      { name: 'score above twenty-one', record: { ...representativeRecord, score: 22 } },
+      { name: 'fractional score', record: { ...representativeRecord, score: 1.5 } },
+      { name: 'non-numeric score', record: { ...representativeRecord, score: '10' } },
+      { name: 'invalid category', record: { ...representativeRecord, category: 'unknown' } }
+    ];
+
+    for (const fixture of invalidRecordFixtures) {
+      expectInvalidRecordFixture(fixture.name, fixture.record);
+    }
+  });
+
+  it('rejects each result field fixture independently', () => {
+    const result = representativeRecord.result;
+    const resultFieldFixtures: Array<{ field: string; record: unknown }> = [
+      { field: 'score', record: withResult({ score: 22 }) },
+      { field: 'category', record: withResult({ category: 'unknown' }) },
+      { field: 'severity', record: withResult({ severity: 7 }) },
+      { field: 'recommendation', record: withResult({ recommendation: 7 }) },
+      { field: 'warning', record: withResult({ warning: 'unexpected warning' }) },
+      { field: 'emoji', record: withResult({ emoji: 7 }) }
+    ];
+
+    for (const fixture of resultFieldFixtures) {
+      expectInvalidRecordFixture(`invalid result ${fixture.field}`, fixture.record);
+    }
+
+    function withResult(changes: Record<string, unknown>): unknown {
+      return { ...representativeRecord, result: { ...result, ...changes } };
+    }
+  });
+
+  it('rejects each gauge and marker field fixture independently', () => {
+    const gauge = representativeRecord.result.gauge;
+    const gaugeFieldFixtures: Array<{ field: string; record: unknown }> = [
+      { field: 'min', record: withGauge({ min: 1 }) },
+      { field: 'max', record: withGauge({ max: 20 }) },
+      { field: 'value', record: withGauge({ value: 1.5 }) },
+      { field: 'color', record: withGauge({ color: 7 }) },
+      { field: 'marker.color', record: withGauge({ marker: { ...gauge.marker, color: 7 } }) },
+      { field: 'marker.type', record: withGauge({ marker: { ...gauge.marker, type: 'circle' } }) },
+      { field: 'marker.size', record: withGauge({ marker: { ...gauge.marker, size: 9 } }) },
+      { field: 'marker.label', record: withGauge({ marker: { ...gauge.marker, label: 7 } }) }
+    ];
+
+    for (const fixture of gaugeFieldFixtures) {
+      expectInvalidRecordFixture(`invalid gauge ${fixture.field}`, fixture.record);
+    }
+
+    function withGauge(changes: Record<string, unknown>): unknown {
+      return {
+        ...representativeRecord,
+        result: { ...representativeRecord.result, gauge: { ...gauge, ...changes } }
+      };
+    }
+  });
+
+  function withoutField(field: keyof typeof representativeRecord): unknown {
+    const record = { ...representativeRecord } as Record<string, unknown>;
+    delete record[field];
+    return record;
+  }
+
+  function expectInvalidRecordFixture(name: string, record: unknown): void {
+    const outcome = inspectGad7AssessmentStorage(JSON.stringify({ version: 1, records: [record] }));
+    expect(outcome.status).withContext(name).toBe('invalid');
+    expect(outcome.records).withContext(name).toEqual([]);
+  }
 });

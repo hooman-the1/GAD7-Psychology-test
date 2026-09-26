@@ -97,6 +97,22 @@ describe('Gad7AssessmentPersistenceService', () => {
     expect(storage.getItem(GAD7_STORAGE_KEY)).toBe(raw);
   });
 
+  it('preserves an all-invalid current envelope without rewriting it on load', () => {
+    const raw = JSON.stringify({
+      version: GAD7_STORAGE_SCHEMA_VERSION,
+      records: [{ id: 7 }, { ...({ id: 'invalid-answer-record' }), answers: [4] }]
+    });
+    storage.setItem(GAD7_STORAGE_KEY, raw);
+
+    const outcome = service.load();
+
+    expect(outcome.records).toEqual([]);
+    expect(outcome.status).toBe('invalid');
+    expect(outcome.diagnostic?.code).toBe('invalid-records');
+    expect(outcome.rejectedRecordCount).toBe(2);
+    expect(storage.getItem(GAD7_STORAGE_KEY)).toBe(raw);
+  });
+
   it('preserves multiple records newest first, including zero and maximum scores', () => {
     const zero = { ...result, score: 0, category: 'minimal' as const, gauge: { ...result.gauge, value: 0 } };
     const maximum = { ...result, score: 21, category: 'severe' as const, gauge: { ...result.gauge, value: 21 } };
