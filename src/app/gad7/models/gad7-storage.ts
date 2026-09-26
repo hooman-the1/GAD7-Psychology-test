@@ -6,6 +6,11 @@ export const GAD7_STORAGE_KEY = 'gad7.assessment-history';
 /** Version of the persisted envelope understood by the current contract. */
 export const GAD7_STORAGE_SCHEMA_VERSION = 1 as const;
 
+const GAD7_MIN_SCORE = 0;
+const GAD7_MAX_SCORE = 21;
+const INVALID_GAD7_SCORE_MESSAGE =
+  'GAD-7 score must be an integer between 0 and 21';
+
 /** A completed result copied at submission time for read-only display. */
 export type Gad7ResultSnapshot = Gad7Interpretation;
 
@@ -31,6 +36,7 @@ export interface Gad7AssessmentStorageEnvelope {
 export function serializeGad7AssessmentEnvelope(
   envelope: Gad7AssessmentStorageEnvelope
 ): string {
+  envelope.records.forEach((record) => validateGad7Score(record.score));
   return JSON.stringify(envelope);
 }
 
@@ -44,5 +50,13 @@ export function serializeGad7AssessmentEnvelope(
 export function deserializeGad7AssessmentEnvelope(
   serialized: string
 ): Gad7AssessmentStorageEnvelope {
-  return JSON.parse(serialized) as Gad7AssessmentStorageEnvelope;
+  const envelope = JSON.parse(serialized) as Gad7AssessmentStorageEnvelope;
+  envelope.records.forEach((record) => validateGad7Score(record.score));
+  return envelope;
+}
+
+function validateGad7Score(score: number): void {
+  if (!Number.isInteger(score) || score < GAD7_MIN_SCORE || score > GAD7_MAX_SCORE) {
+    throw new RangeError(INVALID_GAD7_SCORE_MESSAGE);
+  }
 }

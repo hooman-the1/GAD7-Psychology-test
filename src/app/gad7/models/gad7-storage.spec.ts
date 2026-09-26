@@ -53,6 +53,28 @@ describe('GAD-7 assessment storage contract', () => {
     expect(serializeGad7AssessmentEnvelope(envelope())).toBe(JSON.stringify(envelope()));
   });
 
+  it('accepts the inclusive GAD-7 score boundaries', () => {
+    expect(() => serializeGad7AssessmentEnvelope(envelope({ ...representativeRecord, score: 0 }))).not.toThrow();
+    expect(() => serializeGad7AssessmentEnvelope(envelope({ ...representativeRecord, score: 21 }))).not.toThrow();
+  });
+
+  it('rejects scores below 0, above 21, and fractional scores at the storage boundary', () => {
+    for (const score of [-1, 22, 10.5]) {
+      expect(() => serializeGad7AssessmentEnvelope(envelope({ ...representativeRecord, score })))
+        .toThrowError(RangeError, 'GAD-7 score must be an integer between 0 and 21');
+    }
+  });
+
+  it('rejects an invalid score when reading serialized storage data', () => {
+    const serialized = JSON.stringify({
+      ...envelope(),
+      records: [{ ...representativeRecord, score: 22 }]
+    });
+
+    expect(() => deserializeGad7AssessmentEnvelope(serialized))
+      .toThrowError(RangeError, 'GAD-7 score must be an integer between 0 and 21');
+  });
+
   it('preserves all-zero answers and a non-zero answer permutation', () => {
     const zeroRecord: Gad7AssessmentRecord = {
       ...representativeRecord,
