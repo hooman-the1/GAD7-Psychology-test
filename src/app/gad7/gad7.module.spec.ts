@@ -88,4 +88,94 @@ describe('local GAD-7 feature boundary', () => {
     expect(component.questionnaire.controls.answer3.valid).toBeTrue();
     expect(component.questionnaire.controls.answer3.value).toBe(3);
   });
+
+  it('submits locally in question order and renders the calculated interpretation', () => {
+    const fixture = createFixture();
+    const component = fixture.componentInstance;
+    const selectedAnswers = [3, 0, 2, 1, 0, 3, 1] as const;
+
+    [6, 0, 4, 2, 1, 5, 3].forEach((index) => {
+      const answer = selectedAnswers[index];
+      component.questionnaire.controls[`answer${index}` as keyof typeof component.questionnaire.controls]
+        .setValue(answer);
+    });
+
+    expect(component.submitQuestionnaire()).toBeTrue();
+    fixture.detectChanges();
+
+    expect(component.submittedAnswers).toEqual(selectedAnswers);
+    expect(component.activeResult).toEqual(jasmine.objectContaining({
+      score: 10,
+      category: 'moderate'
+    }));
+    expect(fixture.nativeElement.querySelector('[data-active-result]')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('[data-result-score]').textContent).toContain('10');
+  });
+
+  it('displays the locally calculated total for every representative score boundary', () => {
+    [0, 1, 4, 5, 9, 10, 14, 15, 19, 20, 21].forEach((expectedScore) => {
+      const fixture = createFixture();
+      const answers = Array(7).fill(0) as number[];
+      let remaining = expectedScore;
+      answers.forEach((_, index) => {
+        answers[index] = Math.min(3, remaining);
+        remaining -= answers[index];
+      });
+
+      answers.forEach((answer, index) => {
+        fixture.componentInstance.questionnaire.controls[
+          `answer${index}` as keyof typeof fixture.componentInstance.questionnaire.controls
+        ].setValue(answer);
+      });
+
+      expect(fixture.componentInstance.submitQuestionnaire()).toBeTrue();
+      expect(fixture.componentInstance.activeResult?.score).toBe(expectedScore);
+    });
+  });
+
+  it('accepts seven zero answers and keeps the same result on repeated submission', () => {
+    const fixture = createFixture();
+    const component = fixture.componentInstance;
+    const answers = [0, 0, 0, 0, 0, 0, 0] as const;
+
+    answers.forEach((answer, index) => {
+      component.questionnaire.controls[`answer${index}` as keyof typeof component.questionnaire.controls]
+        .setValue(answer);
+    });
+
+    expect(component.submitQuestionnaire()).toBeTrue();
+    const firstResult = component.activeResult;
+    expect(component.submitQuestionnaire()).toBeTrue();
+    fixture.detectChanges();
+
+    expect(component.submittedAnswers).toEqual(answers);
+    expect(component.activeResult).toBe(firstResult);
+    expect(component.activeResult?.score).toBe(0);
+    expect(fixture.nativeElement.querySelector('[data-active-result]')).toBeTruthy();
+  });
+
+  it('does not create or replace a result when submission is invalid', () => {
+    const fixture = createFixture();
+    const component = fixture.componentInstance;
+
+    expect(component.submitQuestionnaire()).toBeFalse();
+    fixture.detectChanges();
+
+    expect(component.activeResult).toBeNull();
+    expect(fixture.nativeElement.querySelector('[data-active-result]')).toBeNull();
+  });
+
+  it('does not use local storage while submitting the active assessment', () => {
+    const fixture = createFixture();
+    const component = fixture.componentInstance;
+    const setItem = spyOn(window.localStorage, 'setItem');
+
+    for (let index = 0; index < 7; index += 1) {
+      component.questionnaire.controls[`answer${index}` as keyof typeof component.questionnaire.controls]
+        .setValue(0);
+    }
+
+    expect(component.submitQuestionnaire()).toBeTrue();
+    expect(setItem).not.toHaveBeenCalled();
+  });
 });

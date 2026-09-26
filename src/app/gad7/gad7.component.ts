@@ -2,6 +2,13 @@ import { AbstractControl, FormControl, FormGroup, ValidatorFn, Validators } from
 import { Component } from '@angular/core';
 
 import { questionEntries } from './gad7.constants';
+import {
+  calculateGad7Score,
+  Gad7Answers,
+  Gad7AnswerValue,
+  Gad7Interpretation,
+  getGad7Interpretation
+} from './gad7.helpers';
 
 @Component({
   selector: 'app-gad-7',
@@ -21,6 +28,8 @@ export class Gad7Component {
   });
   validationAttempted = false;
   submissionAccepted = false;
+  submittedAnswers: Gad7Answers | null = null;
+  activeResult: Gad7Interpretation | null = null;
 
   submitQuestionnaire(): boolean {
     this.validationAttempted = true;
@@ -28,9 +37,16 @@ export class Gad7Component {
 
     if (this.questionnaire.invalid) {
       this.submissionAccepted = false;
+      this.submittedAnswers = null;
+      this.activeResult = null;
       return false;
     }
 
+    const answers = this.readAnswers();
+    if (!this.activeResult || !this.answersMatch(answers)) {
+      this.submittedAnswers = answers;
+      this.activeResult = getGad7Interpretation(calculateGad7Score(answers));
+    }
     this.submissionAccepted = true;
     return true;
   }
@@ -45,6 +61,16 @@ export class Gad7Component {
     return new FormControl<number | null>(null, {
       validators: [Validators.required, validAnswerValue()]
     });
+  }
+
+  private readAnswers(): Gad7Answers {
+    return [0, 1, 2, 3, 4, 5, 6].map((index) =>
+      this.answerControl(index).value as Gad7AnswerValue
+    ) as unknown as Gad7Answers;
+  }
+
+  private answersMatch(answers: Gad7Answers): boolean {
+    return this.submittedAnswers?.every((answer, index) => answer === answers[index]) ?? false;
   }
 }
 

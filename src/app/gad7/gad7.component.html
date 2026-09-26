@@ -43,3 +43,20 @@
   </mat-card-actions>
 </mat-card>
 </form>
+
+<section *ngIf="activeResult as result" data-active-result class="result-card">
+  <h2>Result</h2>
+  <p data-result-score>Score: {{ result.score }}</p>
+  <p data-result-category>Category: {{ result.category }}</p>
+  <p data-result-severity>{{ result.emoji }} {{ result.severity }}</p>
+  <p data-result-recommendation>{{ result.recommendation }}</p>
+  <p *ngIf="result.warning" data-result-warning>{{ result.warning }}</p>
+  <div
+    data-result-gauge
+    [style.color]="result.gauge.color"
+    [attr.data-gauge-value]="result.gauge.value"
+    [attr.data-gauge-marker-color]="result.gauge.marker.color"
+  >
+    {{ result.gauge.value }} / {{ result.gauge.max }}
+  </div>
+</section>
