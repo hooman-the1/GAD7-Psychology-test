@@ -1,3 +1,4 @@
+<form [formGroup]="questionnaire" (ngSubmit)="submitQuestionnaire()">
 <mat-card>
   <mat-card-title> GAD-7 </mat-card-title>
   <mat-divider></mat-divider>
@@ -13,7 +14,11 @@
         {{ question.prompt }}
       </p>
 
-      <mat-radio-group class="options" aria-label="Answer choices">
+      <mat-radio-group
+        class="options"
+        [formControlName]="'answer' + questionIndex"
+        aria-label="Answer choices"
+      >
         <mat-radio-button
           *ngFor="let option of question.options"
           class="answer-choice"
@@ -24,6 +29,17 @@
           {{ option.label }}
         </mat-radio-button>
       </mat-radio-group>
+      <div
+        *ngIf="validationAttempted && answerControl(questionIndex).invalid"
+        data-validation-error
+        role="alert"
+      >
+        Answer required.
+      </div>
     </section>
   </mat-card-content>
+  <mat-card-actions>
+    <button mat-raised-button type="submit">ادامه</button>
+  </mat-card-actions>
 </mat-card>
+</form>
