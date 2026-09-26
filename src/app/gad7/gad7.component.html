@@ -1,120 +1,29 @@
 <mat-card>
-  <mat-card-title> تست اضطراب <span>GAD-7</span> </mat-card-title>
+  <mat-card-title> GAD-7 </mat-card-title>
   <mat-divider></mat-divider>
 
-  <mat-card *ngIf="!showResult">
-    <mat-card-title>
-      <p class="intro-text">
-        در
-        <b>دو هفته گذشته</b>
-        ، هر چند وقت یک‌بار با هر یک از مشکلات زیر مواجه بوده‌اید؟
+  <mat-card-content>
+    <section
+      *ngFor="let question of questions; let questionIndex = index"
+      class="question-unit"
+      [attr.data-question]="questionIndex + 1"
+    >
+      <p class="question">
+        <span class="question-number">{{ questionIndex + 1 }}.</span>
+        {{ question.prompt }}
       </p>
-    </mat-card-title>
-    <mat-divider></mat-divider>
-    <form [formGroup]="gadForm" class="p-1 pt-3 p-lg-3">
-      <div *ngIf="currentStep < questions.length">
-        <mat-card-content>
-          <p class="question">
-            {{ currentStep + 1 | latinToPersianNumbers }}.
-            {{ questions[currentStep] }}
-          </p>
-          <mat-radio-group [formControl]="getCurrentControl()" class="options">
-            <mat-radio-button
-              *ngFor="let option of [0, 1, 2, 3]"
-              [value]="option"
-            >
-              {{
-                option === 0
-                  ? "اصلا تجربه نکردم"
-                  : option === 1
-                  ? "چند روز در دو هفته گذشته تجربه کردم"
-                  : option === 2
-                  ? "بیشتر از یک هفته تجربه کردم"
-                  : "تقریبا هر روز تجربه کردم"
-              }}
-            </mat-radio-button>
-          </mat-radio-group>
-        </mat-card-content>
 
-        <mat-card-actions class="button-group">
-          <button mat-button (click)="prev()" [disabled]="currentStep === 0">
-            قبلی
-          </button>
-          <button
-            mat-raised-button
-            color="primary"
-            (click)="next()"
-            *ngIf="currentStep < questions.length - 1"
-            [disabled]="getCurrentControl().invalid"
-          >
-            بعدی
-          </button>
-          <button
-            mat-raised-button
-            color="accent"
-            (click)="submit()"
-            *ngIf="currentStep === questions.length - 1"
-            [disabled]="getCurrentControl().invalid"
-          >
-            ثبت پاسخ‌ها
-          </button>
-        </mat-card-actions>
-
-        <mat-progress-bar
-          mode="determinate"
-          [value]="((currentStep + 1) / questions.length) * 100"
-        ></mat-progress-bar>
-      </div>
-    </form>
-  </mat-card>
-  <mat-card *ngIf="showResult" class="result-card">
-    <mat-card-title>نتیجه تست</mat-card-title>
-    <mat-divider></mat-divider>
-    <mat-card-content class="mt-5">
-      <p>
-        <strong>مجموع امتیاز:</strong> {{ totalScore | latinToPersianNumbers }}
-      </p>
-      <p>
-        <strong>شدت اضطراب:</strong>
-        <span [style.color]="severityColor" style="font-weight: bold">
-          {{ severityEmojiIcon }} {{ severityText }}
-        </span>
-      </p>
-      <p><strong>توصیه:</strong> {{ recommendationText }}</p>
-
-      <div style="margin-top: 20px">
-        <div style="margin-top: 30px; text-align: center">
-          <ngx-gauge
-            [value]="gaugeValue"
-            [label]="''"
-            [min]="0"
-            [max]="21"
-            [size]="220"
-            [type]="'arch'"
-            [thick]="15"
-            [foregroundColor]="severityColor"
-            [duration]="2500"
-            [cap]="'round'"
-            [append]="''"
-            [markers]="gaugeMarkers"
-            [margin]="20"
-          ></ngx-gauge>
-
-          <p style="text-align: center; font-size: 18px; margin-top: 10px">
-            {{ gaugeValue | latinToPersianNumbers }} امتیاز
-          </p>
-        </div>
-      </div>
-    </mat-card-content>
-    <mat-card-actions>
-      <button
-        mat-stroked-button
-        class="retake-button"
-        color="primary"
-        (click)="restart()"
-      >
-        انجام مجدد تست
-      </button>
-    </mat-card-actions>
-  </mat-card>
+      <mat-radio-group class="options" aria-label="Answer choices">
+        <mat-radio-button
+          *ngFor="let option of question.options"
+          class="answer-choice"
+          [attr.data-choice]="option.value"
+          [attr.data-value]="option.value"
+          [value]="option.value"
+        >
+          {{ option.label }}
+        </mat-radio-button>
+      </mat-radio-group>
+    </section>
+  </mat-card-content>
 </mat-card>
