@@ -35,10 +35,16 @@ export class Gad7Component {
   submittedAnswers: Gad7Answers | null = null;
   activeResult: Gad7Interpretation | null = null;
   savedAssessments: readonly Gad7AssessmentRecord[];
+  selectedAssessmentId: string | null = null;
+  historyUnavailable = false;
   persistenceFailure: unknown | null = null;
 
   constructor(private readonly persistence: Gad7AssessmentPersistenceService) {
-    this.savedAssessments = persistence.load().records;
+    const history = persistence.load();
+    this.savedAssessments = history.records;
+    this.historyUnavailable = history.status !== 'missing'
+      && history.status !== 'valid'
+      && history.status !== 'recovered';
   }
 
   submitQuestionnaire(): boolean {
@@ -61,6 +67,7 @@ export class Gad7Component {
     this.persistenceFailure = saveOutcome.success ? null : saveOutcome.error ?? new Error('GAD-7 persistence failed');
     if (saveOutcome.success && saveOutcome.record) {
       this.savedAssessments = [saveOutcome.record, ...this.savedAssessments];
+      this.historyUnavailable = false;
     }
     this.submissionAccepted = true;
     return true;
@@ -73,6 +80,12 @@ export class Gad7Component {
     this.submittedAnswers = null;
     this.activeResult = null;
     this.persistenceFailure = null;
+  }
+
+  selectAssessment(recordId: string): void {
+    this.selectedAssessmentId = this.savedAssessments.some((record) => record.id === recordId)
+      ? recordId
+      : null;
   }
 
   answerControl(questionIndex: number): FormControl<number | null> {

@@ -68,3 +68,38 @@
     Restart assessment
   </button>
 </section>
+
+<section data-assessment-history aria-labelledby="assessment-history-title">
+  <h2 id="assessment-history-title">Assessment history</h2>
+  <p *ngIf="historyUnavailable" data-history-unavailable role="status">
+    Assessment history unavailable.
+  </p>
+  <p *ngIf="!historyUnavailable && savedAssessments.length === 0" data-history-empty role="status">
+    No saved assessments.
+  </p>
+  <ol *ngIf="!historyUnavailable && savedAssessments.length > 0" data-history-list>
+    <li
+      *ngFor="let record of savedAssessments"
+      data-history-item
+      [attr.data-record-id]="record.id"
+    >
+      <span data-history-record-id>{{ record.id }}</span>
+      <time [attr.datetime]="record.completedAt" data-history-completed-at>
+        {{ record.completedAt }}
+      </time>
+      <span data-history-score>Score: {{ record.score }}</span>
+      <span data-history-category>Category: {{ record.category }}</span>
+      <button
+        type="button"
+        data-history-select
+        [attr.aria-label]="'Select assessment ' + record.id"
+        (click)="selectAssessment(record.id)"
+      >
+        View assessment
+      </button>
+    </li>
+  </ol>
+  <p *ngIf="selectedAssessmentId as selectedId" data-history-selection role="status">
+    Selected assessment: {{ selectedId }} (read-only)
+  </p>
+</section>

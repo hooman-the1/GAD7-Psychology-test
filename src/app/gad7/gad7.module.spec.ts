@@ -1,7 +1,9 @@
 import { TestBed } from '@angular/core/testing';
 import { Gad7Module } from './gad7.module';
 import { Gad7Component } from './gad7.component';
+import { getGad7Interpretation } from './gad7.helpers';
 import { GAD7_STORAGE_KEY } from './models/gad7-storage';
+import { Gad7AssessmentPersistenceService } from './services/gad7-persistence.service';
 
 describe('local GAD-7 feature boundary', () => {
   beforeEach(() => window.localStorage.removeItem(GAD7_STORAGE_KEY));
@@ -275,5 +277,77 @@ describe('local GAD-7 feature boundary', () => {
     expect(component.activeResult).toBeNull();
     expect(component.submittedAnswers).toBeNull();
     expect(component.validationAttempted).toBeFalse();
+  });
+
+  it('shows a clear empty history state when no completed assessments exist', () => {
+    const fixture = createFixture();
+
+    expect(fixture.nativeElement.querySelector('[data-assessment-history]')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('[data-history-empty]')?.textContent)
+      .toContain('No saved assessments');
+    expect(fixture.nativeElement.querySelectorAll('[data-history-item]').length).toBe(0);
+  });
+
+  it('renders each saved record once with stored summaries and persistence order', () => {
+    const persistence = new Gad7AssessmentPersistenceService(window.localStorage);
+    const older = persistence.save([0, 0, 0, 0, 0, 0, 0], {
+      ...getGad7Interpretation(0),
+      category: 'minimal'
+    }).record!;
+    const newer = persistence.save([3, 3, 3, 3, 3, 3, 3], {
+      ...getGad7Interpretation(21),
+      category: 'severe'
+    }).record!;
+    const fixture = createFixture();
+    const items = Array.from(fixture.nativeElement.querySelectorAll('[data-history-item]')) as HTMLElement[];
+
+    expect(items.length).toBe(2);
+    expect(items.map((item) => item.dataset['recordId'])).toEqual([newer.id, older.id]);
+    expect(items[0].textContent).toContain(newer.completedAt);
+    expect(items[0].textContent).toContain('21');
+    expect(items[0].textContent).toContain('severe');
+    expect(items[1].textContent).toContain(older.completedAt);
+    expect(items[1].textContent).toContain('0');
+    expect(items[1].textContent).toContain('minimal');
+  });
+
+  it('rebuilds the history list from browser storage when the component is recreated', () => {
+    const persistence = new Gad7AssessmentPersistenceService(window.localStorage);
+    const saved = persistence.save([0, 0, 0, 0, 0, 0, 0], getGad7Interpretation(0)).record!;
+    const refreshedFixture = createFixture();
+
+    expect(refreshedFixture.componentInstance.savedAssessments.map((record) => record.id))
+      .toEqual([saved.id]);
+    expect(refreshedFixture.nativeElement.querySelector('[data-history-item]')?.textContent)
+      .toContain(saved.completedAt);
+  });
+
+  it('shows an unavailable history state and no invalid fields for malformed storage', () => {
+    window.localStorage.setItem(GAD7_STORAGE_KEY, '{not-json');
+    const fixture = createFixture();
+
+    expect(fixture.nativeElement.querySelector('[data-history-unavailable]')?.textContent)
+      .toContain('unavailable');
+    expect(fixture.nativeElement.querySelectorAll('[data-history-item]').length).toBe(0);
+    expect(fixture.nativeElement.textContent).not.toContain('{not-json');
+  });
+
+  it('selects a history record read-only without mutating it or browser storage', () => {
+    const persistence = new Gad7AssessmentPersistenceService(window.localStorage);
+    const saved = persistence.save([0, 0, 0, 0, 0, 0, 0], getGad7Interpretation(0)).record!;
+    const fixture = createFixture();
+    const before = window.localStorage.getItem(GAD7_STORAGE_KEY);
+    const select = fixture.nativeElement.querySelector('[data-history-select]') as HTMLButtonElement;
+
+    expect(select).toBeTruthy();
+    select.click();
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.selectedAssessmentId).toBe(saved.id);
+    expect(window.localStorage.getItem(GAD7_STORAGE_KEY)).toBe(before);
+    expect(fixture.nativeElement.querySelector('[data-history-edit]')).toBeNull();
+    expect(fixture.nativeElement.querySelector('[data-history-delete]')).toBeNull();
+    expect(fixture.nativeElement.querySelector('[data-history-selection]')?.textContent)
+      .toContain(saved.id);
   });
 });
