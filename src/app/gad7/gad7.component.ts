@@ -9,6 +9,10 @@ import {
   Gad7Interpretation,
   getGad7Interpretation
 } from './gad7.helpers';
+import {
+  Gad7AssessmentPersistenceService
+} from './services/gad7-persistence.service';
+import { Gad7AssessmentRecord } from './models/gad7-storage';
 
 @Component({
   selector: 'app-gad-7',
@@ -30,6 +34,12 @@ export class Gad7Component {
   submissionAccepted = false;
   submittedAnswers: Gad7Answers | null = null;
   activeResult: Gad7Interpretation | null = null;
+  savedAssessments: readonly Gad7AssessmentRecord[];
+  persistenceFailure: unknown | null = null;
+
+  constructor(private readonly persistence: Gad7AssessmentPersistenceService) {
+    this.savedAssessments = persistence.load().records;
+  }
 
   submitQuestionnaire(): boolean {
     this.validationAttempted = true;
@@ -46,6 +56,11 @@ export class Gad7Component {
     if (!this.activeResult || !this.answersMatch(answers)) {
       this.submittedAnswers = answers;
       this.activeResult = getGad7Interpretation(calculateGad7Score(answers));
+    }
+    const saveOutcome = this.persistence.save(answers, this.activeResult);
+    this.persistenceFailure = saveOutcome.success ? null : saveOutcome.error ?? new Error('GAD-7 persistence failed');
+    if (saveOutcome.success && saveOutcome.record) {
+      this.savedAssessments = [saveOutcome.record, ...this.savedAssessments];
     }
     this.submissionAccepted = true;
     return true;

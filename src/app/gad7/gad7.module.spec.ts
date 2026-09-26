@@ -1,8 +1,11 @@
 import { TestBed } from '@angular/core/testing';
 import { Gad7Module } from './gad7.module';
 import { Gad7Component } from './gad7.component';
+import { GAD7_STORAGE_KEY } from './models/gad7-storage';
 
 describe('local GAD-7 feature boundary', () => {
+  beforeEach(() => window.localStorage.removeItem(GAD7_STORAGE_KEY));
+  afterEach(() => window.localStorage.removeItem(GAD7_STORAGE_KEY));
   function createFixture() {
     const fixture = TestBed.configureTestingModule({
       imports: [Gad7Module]
@@ -153,21 +156,24 @@ describe('local GAD-7 feature boundary', () => {
     expect(component.submittedAnswers).toEqual(answers);
     expect(component.activeResult).toBe(firstResult);
     expect(component.activeResult?.score).toBe(0);
+    expect(component.savedAssessments).toHaveSize(2);
     expect(fixture.nativeElement.querySelector('[data-active-result]')).toBeTruthy();
   });
 
   it('does not create or replace a result when submission is invalid', () => {
     const fixture = createFixture();
     const component = fixture.componentInstance;
+    const setItem = spyOn(window.localStorage, 'setItem');
 
     expect(component.submitQuestionnaire()).toBeFalse();
     fixture.detectChanges();
 
     expect(component.activeResult).toBeNull();
+    expect(setItem).not.toHaveBeenCalled();
     expect(fixture.nativeElement.querySelector('[data-active-result]')).toBeNull();
   });
 
-  it('does not use local storage while submitting the active assessment', () => {
+  it('persists a valid completed assessment without changing the active result contract', () => {
     const fixture = createFixture();
     const component = fixture.componentInstance;
     const setItem = spyOn(window.localStorage, 'setItem');
@@ -178,6 +184,8 @@ describe('local GAD-7 feature boundary', () => {
     }
 
     expect(component.submitQuestionnaire()).toBeTrue();
-    expect(setItem).not.toHaveBeenCalled();
+    expect(setItem).toHaveBeenCalledWith(GAD7_STORAGE_KEY, jasmine.any(String));
+    expect(component.savedAssessments).toHaveSize(1);
+    expect(component.persistenceFailure).toBeNull();
   });
 });
